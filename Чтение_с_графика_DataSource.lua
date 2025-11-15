@@ -7,20 +7,20 @@ end
 
 function main()
     local TableOFZ = AllocTable()
-    AddColumn(TableOFZ, 1, "Легенда", true, QTABLE_STRING_TYPE, 15)
-    AddColumn(TableOFZ, 2, "Год", true, QTABLE_INT_TYPE, 15)
-    AddColumn(TableOFZ, 3, "Месяц", true, QTABLE_INT_TYPE, 15)
-    AddColumn(TableOFZ, 4, "День", true, QTABLE_INT_TYPE, 15)
-    AddColumn(TableOFZ, 5, "Час", true, QTABLE_INT_TYPE, 15)
-    AddColumn(TableOFZ, 6, "Минута", true, QTABLE_INT_TYPE, 15)
-    AddColumn(TableOFZ, 7, "Открытие", true, QTABLE_INT_TYPE, 15)
-    AddColumn(TableOFZ, 8, "Максимум", true, QTABLE_INT_TYPE, 15)
-    AddColumn(TableOFZ, 9, "Минимум", true, QTABLE_INT_TYPE, 15)
-    AddColumn(TableOFZ, 10, "Закрытие", true, QTABLE_INT_TYPE, 15)
-    AddColumn(TableOFZ, 11, "Объём", true, QTABLE_INT_TYPE, 15)
+    AddColumn(TableOFZ, 1, "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ", true, QTABLE_STRING_TYPE, 15)
+    AddColumn(TableOFZ, 2, "пїЅпїЅпїЅ", true, QTABLE_INT_TYPE, 15)
+    AddColumn(TableOFZ, 3, "пїЅпїЅпїЅпїЅпїЅ", true, QTABLE_INT_TYPE, 15)
+    AddColumn(TableOFZ, 4, "пїЅпїЅпїЅпїЅ", true, QTABLE_INT_TYPE, 15)
+    AddColumn(TableOFZ, 5, "пїЅпїЅпїЅ", true, QTABLE_INT_TYPE, 15)
+    AddColumn(TableOFZ, 6, "пїЅпїЅпїЅпїЅпїЅпїЅ", true, QTABLE_INT_TYPE, 15)
+    AddColumn(TableOFZ, 7, "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ", true, QTABLE_INT_TYPE, 15)
+    AddColumn(TableOFZ, 8, "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ", true, QTABLE_INT_TYPE, 15)
+    AddColumn(TableOFZ, 9, "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ", true, QTABLE_INT_TYPE, 15)
+    AddColumn(TableOFZ, 10, "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ", true, QTABLE_INT_TYPE, 15)
+    AddColumn(TableOFZ, 11, "пїЅпїЅпїЅпїЅпїЅ", true, QTABLE_INT_TYPE, 15)
 
     CreateWindow(TableOFZ)
-    SetWindowCaption(TableOFZ, "Данные с графика ОФЗ 26238 (60 мин.) - через DataSource")
+    SetWindowCaption(TableOFZ, "пїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ 26238 (60 пїЅпїЅпїЅ.) - пїЅпїЅпїЅпїЅпїЅ DataSource")
     SetWindowPos(TableOFZ, 0, 10, 900, 70)
 
     while stopped == false do
@@ -56,5 +56,5 @@ function main()
         end
         sleep(10000)
     end
-    message("Скрипт остановлен!")
+    message("пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ!")
 end
