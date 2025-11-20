@@ -47,7 +47,7 @@ def place_sell_order(price, quantity):
     
 
 
-orders_df = pd.DataFrame(columns=["Order_ID", "Security_Code", "Order_Type", "Placement_Date_Time", "Price"])
+orders_df = pd.DataFrame(columns=["Order_ID", "Security_Code", "Order_Type", "Placement_Date_Time", "Expiry_Date", "Price"])
 curr_orders = qp_provider.get_all_orders()["data"]
 for curr_order in curr_orders:
     if curr_order["balance"] != 0.0 and bin(curr_order["flags"])[2:][-2] != "1":
@@ -55,14 +55,24 @@ for curr_order in curr_orders:
                                        "Security_Code" : curr_order["seccode"],
                                        "Order_Type" : "Buy" if bin(curr_order["flags"])[2:][-3] == "0" else "Sell",
                                        "Placement_Date_Time" : f"{curr_order["datetime"]["day"]}.{curr_order["datetime"]["month"]}.{curr_order["datetime"]["year"]} {curr_order["datetime"]["hour"]}:{curr_order["datetime"]["min"]}:{curr_order["datetime"]["sec"]}",
-                                       "Price" : int(curr_order["value"])}, index=[0])
+                                       "Expiry_Date" : curr_order["expiry"],
+                                       "Price" : curr_order["value"] / curr_order["qty"]}, index=[0])
         if curr_order["ordernum"] not in orders_df["Order_ID"]:
-            orders_df = pd.concat([orders_df, curr_order_row], axis=0)
+            orders_df = pd.concat([orders_df, curr_order_row], axis=0, ignore_index=True)
             
-trades_df = pd.DataFrame(columns=["Trade_ID", "Security_Code", "Trade_Type", "Execution_Date_Type", "Price"])
+trades_df = pd.DataFrame(columns=["Trade_ID", "Order_ID", "Security_Code", "Trade_Type", "Execution_Date_Time", "Price"])
 curr_trades = qp_provider.get_all_trades()["data"]
-#for curr_trade in curr_trades:
-    
+for curr_trade in curr_trades:
+    curr_trade_row = pd.DataFrame({"Trade_ID" : curr_trade["trade_num"],
+                                   "Order_ID" : curr_trade["ordernum"],
+                                   "Security_Code" : curr_trade["seccode"],
+                                   "Trade_Type" : "Buy" if bin(curr_order["flags"])[2:][-2] == "0" else "Sell",
+                                   "Execution_Date_Time" : f"{curr_trade["datetime"]["day"]}.{curr_trade["datetime"]["month"]}.{curr_trade["datetime"]["year"]} {curr_trade["datetime"]["hour"]}:{curr_trade["datetime"]["min"]}:{curr_trade["datetime"]["sec"]}",
+                                   "Price" : curr_trade["price"]}, index=[0])
+    if curr_trade["trade_num"] not in trades_df["Trade_ID"]:
+        trades_df = pd.concat([trades_df, curr_trade_row], axis=0, ignore_index=True)
 
-#print(tabulate(orders_df, headers="keys", tablefmt="psql"))
+
+
+print(tabulate(orders_df, headers="keys", tablefmt="psql"))
 qp_provider.close_connection_and_thread()
