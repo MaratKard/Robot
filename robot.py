@@ -1,63 +1,101 @@
 from QuikPy import QuikPy
 import pandas as pd
-from tabulate import tabulate
 import time
 import warnings
+import itertools
 
 qp_provider = QuikPy()
 
 class_code = "QJSIM"
 sec_code = "SBER"
+trans_id = itertools.count(1)
 
-
-
-def _on_order(data):
-    """Creation of new order/change of existing order handler"""
-    new_orders_df = load_orders()
-    print(tabulate(new_orders_df, headers="keys", tablefmt="psql"))
-    
-    #new_trades_df = load_trades()
-    #print(tabulate(new_trades_df, headers="keys", tablefmt="psql"))
-
-def _on_trade(data):
-    """ Execution of a new trade handler """
-    #new_orders_df = load_orders()
-    #print(tabulate(new_orders_df, headers="keys", tablefmt="psql"))
-    
-    new_trades_df = load_trades()
-    print(tabulate(new_trades_df, headers="keys", tablefmt="psql"))
-       
-    
-
-def place_buy_order(price, quantity) -> None:
-    transaction = {
-        'ACTION': 'NEW_ORDER',
-        'CLASSCODE': class_code,
-        'SECCODE': sec_code,
-        'OPERATION': 'B',
-        'PRICE': str(price),
-        'QUANTITY': str(quantity),
-        'TYPE': 'L'}
-    qp_provider.send_transaction(transaction=transaction)
-    
-def place_sell_order(price, quantity) -> None:
-    transaction = {
-        'ACTION': 'NEW_ORDER',
-        'CLASSCODE': class_code,
-        'SECCODE': sec_code,
-        'OPERATION': 'S',
-        'PRICE': str(price),
-        'QUANTITY': str(quantity),
-        'TYPE': 'L'}
-    qp_provider.send_transaction(transaction=transaction)
-
-
-    
 def read_grid(sec_code) -> pd.DataFrame:
     grid = pd.read_excel(io="Price_contracts_grid.xlsx", sheet_name = sec_code, header=0)
     grid["Quantity_delta_sell"] = grid["Quantity"] - grid["Quantity"].shift(-1).fillna(grid.tail(1)["Quantity"] + 1)
     grid["Quantity_delta_buy"] = grid["Quantity"] - grid["Quantity"].shift(1).fillna(grid.head(1)["Quantity"] - 1)
     return grid
+
+
+
+def _on_order(data):
+    """Creation of new order/change of existing order handler"""
+    #new_orders_df = load_orders()
+    #print(tabulate(new_orders_df, headers="keys", tablefmt="psql"))
+
+def _on_trade(data):
+    """ Execution of a new trade handler """
+    grid = read_grid(sec_code=sec_code)
+    new_trades_df = load_trades()
+    
+    latest_trade = new_trades_df.tail(1)
+    print(f"Цена последней сделки: {float(latest_trade["Price"])}")
+    grid_position_latest_price = grid[grid["Price"] < float(latest_trade["Price"])].head(1).index[0]
+    type_latest_trade = latest_trade["Trade_Type"].to_list()[0]
+    print(f"Тип последней сделки: {type_latest_trade}")
+    
+    if type_latest_trade == "Buy":
+        
+        price_for_buy_order = grid.loc[grid_position_latest_price, "Price"]
+        price_for_sell_order = grid.loc[grid_position_latest_price - 1, "Price"]
+        
+        quantity_for_buy_order = grid.loc[grid_position_latest_price, "Quantity_delta_buy"]
+        quantity_for_sell_order = -grid.loc[grid_position_latest_price - 1, "Quantity_delta_sell"]     
+        
+        if float(latest_trade["Price"]) < price_for_buy_order or float(latest_trade["Price"]) > price_for_sell_order:
+            price_for_buy_order = qp_provider.price_to_quik_price(class_code="QJSIM", sec_code="SBER", price=price_for_buy_order)
+            price_for_sell_order = qp_provider.price_to_quik_price(class_code="QJSIM", sec_code="SBER", price=price_for_sell_order)
+            place_buy_order(price=price_for_buy_order, quantity=quantity_for_buy_order)
+            place_sell_order(price=price_for_sell_order, quantity=quantity_for_sell_order)
+    
+    else:
+        
+        price_for_buy_order = grid.loc[grid_position_latest_price, "Price"]
+        price_for_buy_order = qp_provider.price_to_quik_price(class_code="QJSIM", sec_code="SBER", price=price_for_buy_order)
+        price_for_sell_order = grid.loc[grid_position_latest_price - 1, "Price"]
+        price_for_sell_order = qp_provider.price_to_quik_price(class_code="QJSIM", sec_code="SBER", price=price_for_sell_order)
+        
+        quantity_for_buy_order = grid.loc[grid_position_latest_price, "Quantity_delta_buy"]
+        quantity_for_sell_order = -grid.loc[grid_position_latest_price - 1, "Quantity_delta_sell"]     
+        
+        if float(latest_trade["Price"]) < price_for_buy_order or float(latest_trade["Price"]) > price_for_sell_order:
+            price_for_buy_order = qp_provider.price_to_quik_price(class_code="QJSIM", sec_code="SBER", price=price_for_buy_order)
+            price_for_sell_order = qp_provider.price_to_quik_price(class_code="QJSIM", sec_code="SBER", price=price_for_sell_order)
+            place_buy_order(price=price_for_buy_order, quantity=quantity_for_buy_order)
+            place_sell_order(price=price_for_sell_order, quantity=quantity_for_sell_order)
+
+       
+    
+
+def place_buy_order(price, quantity) -> None:
+    transaction = {
+        "TRANS_ID" : str(next(trans_id)),
+        "CLIENT_CODE" : "10651",
+        "ACCOUNT" : "NL0011100043",
+        'ACTION' : 'NEW_ORDER',
+        'CLASSCODE' : "QJSIM",
+        'SECCODE' : "SBER",
+        'OPERATION' : 'B',
+        'PRICE' : str(price),
+        'QUANTITY' : str(int(quantity)),
+        'TYPE' : 'L'}
+    print(qp_provider.send_transaction(transaction=transaction))
+    
+def place_sell_order(price, quantity) -> None:
+    transaction = {
+        "TRANS_ID" : str(next(trans_id)),
+        "CLIENT_CODE" : "10651",
+        "ACCOUNT" : "NL0011100043",
+        'ACTION' : 'NEW_ORDER',
+        'CLASSCODE' : "QJSIM",
+        'SECCODE' : "SBER",
+        'OPERATION' : 'S',
+        'PRICE' : str(price),
+        'QUANTITY' : str(int(quantity)),
+        'TYPE' : 'L'}
+    print(qp_provider.send_transaction(transaction=transaction))
+
+
 
 def load_orders() -> pd.DataFrame:
     curr_orders = qp_provider.get_all_orders()["data"]
@@ -92,9 +130,10 @@ def load_trades() -> pd.DataFrame:
 
 
 
-for i in range(10000):
-    qp_provider.on_order.subscribe(_on_order)
-    qp_provider.on_trade.subscribe(_on_trade)
-    time.sleep(0.5)
+qp_provider.on_order.subscribe(_on_order)
+qp_provider.on_trade.subscribe(_on_trade)
+
+for i in range(1000000):
+    time.sleep(0.01)
 
 qp_provider.close_connection_and_thread()
