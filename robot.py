@@ -3,12 +3,18 @@ import pandas as pd
 import time
 import warnings
 import itertools
+warnings.simplefilter("ignore")
 
 qp_provider = QuikPy()
 
 class_code = "QJSIM"
 sec_code = "SBER"
-trans_id = itertools.count(1)
+trans_id_buy = itertools.count(start=2, step=2)
+trans_id_sell = itertools.count(start=3, step=2)
+trans_id_remove = 1
+order_num_buy = 0
+order_num_sell = 0
+
 
 def read_grid(sec_code) -> pd.DataFrame:
     grid = pd.read_excel(io="Price_contracts_grid.xlsx", sheet_name = sec_code, header=0)
@@ -17,6 +23,14 @@ def read_grid(sec_code) -> pd.DataFrame:
     return grid
 
 
+
+def _on_trans_reply(data):
+    global order_num_buy
+    global order_num_sell
+    if int(data["data"]["trans_id"] % 2) == 0:
+        order_num_buy = int(data["data"]["order_num"])
+    else:
+        order_num_sell = int(data["data"]["order_num"])
 
 def _on_order(data):
     """Creation of new order/change of existing order handler"""
@@ -36,45 +50,43 @@ def _on_trade(data):
     
     if type_latest_trade == "Buy":
         
-        price_for_buy_order = grid.loc[grid_position_latest_price, "Price"]
-        price_for_sell_order = grid.loc[grid_position_latest_price - 1, "Price"]
+        price_for_buy_order = round(grid.loc[grid_position_latest_price + 1, "Price"], 2)
+        price_for_sell_order = round(grid.loc[grid_position_latest_price - 1, "Price"], 2)
         
-        quantity_for_buy_order = grid.loc[grid_position_latest_price, "Quantity_delta_buy"]
-        quantity_for_sell_order = -grid.loc[grid_position_latest_price - 1, "Quantity_delta_sell"]     
+        quantity_for_buy_order = grid.loc[grid_position_latest_price + 1, "Quantity_delta_buy"]
+        quantity_for_sell_order = -grid.loc[grid_position_latest_price - 1, "Quantity_delta_sell"]
         
-        if float(latest_trade["Price"]) < price_for_buy_order or float(latest_trade["Price"]) > price_for_sell_order:
-            price_for_buy_order = qp_provider.price_to_quik_price(class_code="QJSIM", sec_code="SBER", price=price_for_buy_order)
-            price_for_sell_order = qp_provider.price_to_quik_price(class_code="QJSIM", sec_code="SBER", price=price_for_sell_order)
-            place_buy_order(price=price_for_buy_order, quantity=quantity_for_buy_order)
-            place_sell_order(price=price_for_sell_order, quantity=quantity_for_sell_order)
+        global order_num_sell
+        remove_sell_order(order_num=order_num_sell)
+
+        place_buy_order(price=price_for_buy_order, quantity=quantity_for_buy_order)
+        place_sell_order(price=price_for_sell_order, quantity=quantity_for_sell_order)
     
     else:
         
-        price_for_buy_order = grid.loc[grid_position_latest_price, "Price"]
-        price_for_buy_order = qp_provider.price_to_quik_price(class_code="QJSIM", sec_code="SBER", price=price_for_buy_order)
-        price_for_sell_order = grid.loc[grid_position_latest_price - 1, "Price"]
-        price_for_sell_order = qp_provider.price_to_quik_price(class_code="QJSIM", sec_code="SBER", price=price_for_sell_order)
+        price_for_buy_order = round(grid.loc[grid_position_latest_price + 1, "Price"], 2)
+        price_for_sell_order = round(grid.loc[grid_position_latest_price - 1, "Price"], 2)
         
-        quantity_for_buy_order = grid.loc[grid_position_latest_price, "Quantity_delta_buy"]
-        quantity_for_sell_order = -grid.loc[grid_position_latest_price - 1, "Quantity_delta_sell"]     
+        quantity_for_buy_order = grid.loc[grid_position_latest_price + 1, "Quantity_delta_buy"]
+        quantity_for_sell_order = -grid.loc[grid_position_latest_price - 1, "Quantity_delta_sell"]
         
-        if float(latest_trade["Price"]) < price_for_buy_order or float(latest_trade["Price"]) > price_for_sell_order:
-            price_for_buy_order = qp_provider.price_to_quik_price(class_code="QJSIM", sec_code="SBER", price=price_for_buy_order)
-            price_for_sell_order = qp_provider.price_to_quik_price(class_code="QJSIM", sec_code="SBER", price=price_for_sell_order)
-            place_buy_order(price=price_for_buy_order, quantity=quantity_for_buy_order)
-            place_sell_order(price=price_for_sell_order, quantity=quantity_for_sell_order)
+        global order_num_buy
+        remove_buy_order(order_num=order_num_buy)
+        
+        place_buy_order(price=price_for_buy_order, quantity=quantity_for_buy_order)
+        place_sell_order(price=price_for_sell_order, quantity=quantity_for_sell_order)
 
        
     
 
 def place_buy_order(price, quantity) -> None:
     transaction = {
-        "TRANS_ID" : str(next(trans_id)),
+        "TRANS_ID" : str(next(trans_id_buy)),
         "CLIENT_CODE" : "10651",
         "ACCOUNT" : "NL0011100043",
         'ACTION' : 'NEW_ORDER',
-        'CLASSCODE' : "QJSIM",
-        'SECCODE' : "SBER",
+        'CLASSCODE' : class_code,
+        'SECCODE' : sec_code,
         'OPERATION' : 'B',
         'PRICE' : str(price),
         'QUANTITY' : str(int(quantity)),
@@ -83,16 +95,34 @@ def place_buy_order(price, quantity) -> None:
     
 def place_sell_order(price, quantity) -> None:
     transaction = {
-        "TRANS_ID" : str(next(trans_id)),
+        "TRANS_ID" : str(next(trans_id_sell)),
         "CLIENT_CODE" : "10651",
         "ACCOUNT" : "NL0011100043",
         'ACTION' : 'NEW_ORDER',
-        'CLASSCODE' : "QJSIM",
-        'SECCODE' : "SBER",
+        'CLASSCODE' : class_code,
+        'SECCODE' : sec_code,
         'OPERATION' : 'S',
         'PRICE' : str(price),
         'QUANTITY' : str(int(quantity)),
         'TYPE' : 'L'}
+    print(qp_provider.send_transaction(transaction=transaction))
+    
+def remove_buy_order(order_num) -> None:
+    transaction = {
+        'TRANS_ID': str(trans_id_remove),
+        'ACTION': 'KILL_ORDER',
+        'CLASSCODE': class_code,
+        'SECCODE': sec_code,
+        'ORDER_KEY': str(order_num)}
+    print(qp_provider.send_transaction(transaction=transaction))
+    
+def remove_sell_order(order_num) -> None:
+    transaction = {
+        'TRANS_ID': str(trans_id_remove),
+        'ACTION': 'KILL_ORDER',
+        'CLASSCODE': class_code,
+        'SECCODE': sec_code,
+        'ORDER_KEY': str(order_num)}
     print(qp_provider.send_transaction(transaction=transaction))
 
 
@@ -132,8 +162,7 @@ def load_trades() -> pd.DataFrame:
 
 qp_provider.on_order.subscribe(_on_order)
 qp_provider.on_trade.subscribe(_on_trade)
+qp_provider.on_trans_reply.subscribe(_on_trans_reply)
 
-for i in range(1000000):
+while True:
     time.sleep(0.01)
-
-qp_provider.close_connection_and_thread()
