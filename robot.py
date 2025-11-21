@@ -43,10 +43,8 @@ def _on_trade(data):
     new_trades_df = load_trades()
     
     latest_trade = new_trades_df.tail(1)
-    print(f"Цена последней сделки: {float(latest_trade["Price"])}")
     grid_position_latest_price = grid[grid["Price"] < float(latest_trade["Price"])].head(1).index[0]
     type_latest_trade = latest_trade["Trade_Type"].to_list()[0]
-    print(f"Тип последней сделки: {type_latest_trade}")
     
     if type_latest_trade == "Buy":
         
@@ -91,7 +89,9 @@ def place_buy_order(price, quantity) -> None:
         'PRICE' : str(price),
         'QUANTITY' : str(int(quantity)),
         'TYPE' : 'L'}
-    print(qp_provider.send_transaction(transaction=transaction))
+    transaction_result = qp_provider.send_transaction(transaction=transaction)["data"]
+    if transaction_result != True:
+        print(transaction_result)
     
 def place_sell_order(price, quantity) -> None:
     transaction = {
@@ -105,7 +105,9 @@ def place_sell_order(price, quantity) -> None:
         'PRICE' : str(price),
         'QUANTITY' : str(int(quantity)),
         'TYPE' : 'L'}
-    print(qp_provider.send_transaction(transaction=transaction))
+    transaction_result = qp_provider.send_transaction(transaction=transaction)
+    if transaction_result != True:
+        print(transaction_result)
     
 def remove_buy_order(order_num) -> None:
     transaction = {
@@ -126,6 +128,22 @@ def remove_sell_order(order_num) -> None:
     print(qp_provider.send_transaction(transaction=transaction))
 
 
+def init() -> None:
+    grid = read_grid(sec_code=sec_code)
+    
+    last_trade_before_init = qp_provider.get_trade(class_code=class_code, sec_code=sec_code)["data"][-1]
+    last_price_before_init = last_trade_before_init["price"]
+    
+    grid_position_last_price_before_init = int(grid[grid["Price"] < float(last_price_before_init)].head(1).index[0])
+    
+    price_for_buy_order = round(grid.loc[grid_position_last_price_before_init + 1, "Price"], 2)
+    price_for_sell_order = round(grid.loc[grid_position_last_price_before_init - 1, "Price"], 2)
+    
+    quantity_for_buy_order = grid.loc[grid_position_last_price_before_init + 1, "Quantity_delta_buy"]
+    quantity_for_sell_order = -grid.loc[grid_position_last_price_before_init - 1, "Quantity_delta_sell"]
+    
+    place_buy_order(price=price_for_buy_order, quantity=quantity_for_buy_order)
+    place_sell_order(price=price_for_sell_order, quantity=quantity_for_sell_order)
 
 def load_orders() -> pd.DataFrame:
     curr_orders = qp_provider.get_all_orders()["data"]
@@ -163,6 +181,8 @@ def load_trades() -> pd.DataFrame:
 qp_provider.on_order.subscribe(_on_order)
 qp_provider.on_trade.subscribe(_on_trade)
 qp_provider.on_trans_reply.subscribe(_on_trans_reply)
+
+init()
 
 while True:
     time.sleep(0.01)
