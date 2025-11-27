@@ -1,11 +1,11 @@
 from QuikPy import QuikPy # для взаимодействия с Quik
 import pandas as pd # для удобной работы с таблицами
 import time # для установки задержки в работе программы
-import warnings # для заглушения предупреждений
+import warnings # для заглушения предупреждений в коде
 import itertools # для генерации ID транзакций
 warnings.simplefilter("ignore") # КОСТЫЛЬ, УБРАТЬ!!!
 
-qp_provider = QuikPy()
+qp_provider = QuikPy() # устанавливаем соединение с Quik
 
 class_code = "QJSIM"
 sec_code = "SBER"
@@ -52,7 +52,7 @@ def _on_trade(data) -> None:
         quantity_for_sell_order = -grid.loc[grid_position_latest_price - 1, "Quantity_delta_sell"] # задаём количество для заявки на продажу (предыдущая строка schedule'a)
         
         global order_num_sell
-        remove_sell_order(order_num=order_num_sell) # снимаем оставшуюся заявку на покупку
+        remove_sell_order(order_num=order_num_sell) # снимаем оставшуюся заявку на продажу
 
         place_buy_order(price=price_for_buy_order, quantity=quantity_for_buy_order, order_type="L")
         place_sell_order(price=price_for_sell_order, quantity=quantity_for_sell_order, order_type="L")
@@ -66,7 +66,7 @@ def _on_trade(data) -> None:
         quantity_for_sell_order = -grid.loc[grid_position_latest_price - 1, "Quantity_delta_sell"] # задаём количество для заявки на продажу (предыдущая строка schedule'a)
         
         global order_num_buy
-        remove_buy_order(order_num=order_num_buy) # снимаем оставшуюся заявку на продажу
+        remove_buy_order(order_num=order_num_buy) # снимаем оставшуюся заявку на покупку
         
         place_buy_order(price=price_for_buy_order, quantity=quantity_for_buy_order, order_type="L")
         place_sell_order(price=price_for_sell_order, quantity=quantity_for_sell_order, order_type="L")
@@ -86,7 +86,7 @@ def place_buy_order(quantity, order_type, price=0) -> None:
         'PRICE' : str(price),
         'QUANTITY' : str(int(quantity)),
         'TYPE' : order_type}
-    qp_provider.send_transaction(transaction=transaction)["data"]
+    qp_provider.send_transaction(transaction=transaction)
     
 def place_sell_order(quantity, order_type, price=0) -> None:
     transaction = {
@@ -140,7 +140,7 @@ def init() -> None:
         place_sell_order(quantity=-init_order_quantity, order_type="M")
 
 def load_orders() -> pd.DataFrame:
-    """ Функция загружает новые заявки """
+    """ Функция загружает наши заявки """
     curr_orders = qp_provider.get_all_orders()["data"] # получаем все заявки
     new_orders_df = pd.DataFrame(columns=["Order_ID", "Security_Code", "Order_Type", "Placement_Date_Time", "Expiry_Date", "Price"]) # создаём датафрейм, в который запишем новые заявки
     for curr_order in curr_orders: # для каждой загруженной заявки
@@ -160,7 +160,7 @@ def load_orders() -> pd.DataFrame:
     return new_orders_df
 
 def load_trades() -> pd.DataFrame:
-    """ Функция загружает новые сделки """
+    """ Функция загружает наши сделки """
     curr_trades = qp_provider.get_all_trades()["data"] # получаем все НАШИ сделки
     new_trades_df = pd.DataFrame(columns=["Trade_ID", "Order_ID", "Security_Code", "Trade_Type", "Execution_Date_Time", "Price"]) # создаём датафрейм, в который запишем новые сделки
     for curr_trade in curr_trades: # для каждой загруженной сделки
@@ -180,10 +180,23 @@ def load_trades() -> pd.DataFrame:
 
 
 
-qp_provider.on_trade.subscribe(_on_trade) # подписываемся *объяснить папе* на новые сделки
+qp_provider.on_trade.subscribe(_on_trade) # подписываемся на новые сделки
 qp_provider.on_trans_reply.subscribe(_on_trans_reply) # подписываемся на результат отправки заявки
 
 init()
 
 while True: # бесконечный цикл
-    time.sleep(0.01) # задержка на 0.01 секунду между любыми операциями
+    time.sleep(0.1) # задержка на 0.1 секунду между любыми операциями
+
+# сделать в Excel таблицу инструментов    
+# сделать проверку спрэда при инициализации (lster)
+
+# нужно вытаскивать цену в заявке, по которой прошла последняя наша сделка по инструменту, 
+# и проверять на соответствие количества контрактов
+# если правильно:
+#    начинаю по schedule без "выравниваний"
+# если нет:
+#    quit() и сообщение в Quik
+
+# в schedule будет остановка
+# что делать, если поис к schedule не нашёл нужного уровня?
